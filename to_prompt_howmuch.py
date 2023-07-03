@@ -12,11 +12,12 @@ print(f'Using device: {device}')
 model = transformer_lens.HookedTransformer.from_pretrained('gpt2-small', device=device)
 print(f'n_layers = {model.cfg.n_layers}, n_heads = {model.cfg.n_heads}, d_model = {model.cfg.d_model}')
 
-toks = model.tokenizer.encode(prompt)
+toks = model.to_tokens(prompt)[0]
+n_toks = len(toks)
 print(f'prompt = {prompt}')
-print(f'n_toks = {len(toks)}')
+print(f'n_toks = {n_toks}')
 
-predictions, cache = model.run_with_cache([prompt])
+predictions, cache = model.run_with_cache(prompt)
 
 llayer = 4
 lhead = 0
@@ -48,9 +49,20 @@ for layer in range(llayer):
     attn_pseudo_inp.append((a @ inp_stuff) * ln1_scale)
     mlp_pseudo_inp.append((m @ inp_stuff) * ln1_scale)
 
-debug_sum = (resid_start @ inp_stuff) * ln1_scale + inp_bias
+debug_sum_start = (resid_start @ inp_stuff) * ln1_scale + inp_bias
+debug_sum = debug_sum_start
 for layer in range(llayer):
     debug_sum = debug_sum + attn_pseudo_inp[layer] + mlp_pseudo_inp[layer]
 print(debug_sum[:4,:4])
 print(inp_llayer[:4,:4])
 print(((resid_llayer @ inp_stuff) * ln1_scale + inp_bias)[:4,:4])
+
+viz = np.zeros((n_toks, 2 * llayer+1))
+viz[:,0] = debug_sum_start.norm(dim=1).cpu().numpy()
+for layer in range(llayer):
+    viz[:,2*layer+1] = attn_pseudo_inp[layer].norm(dim=1).cpu().numpy()
+    viz[:,2*layer+2] = mlp_pseudo_inp[layer].norm(dim=1).cpu().numpy()
+
+plt.imshow(viz)
+plt.show()
+
