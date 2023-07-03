@@ -17,8 +17,6 @@ print(f'prompt = {prompt}')
 print(f'n_toks = {len(toks)}')
 
 predictions, cache = model.run_with_cache([prompt])
-print(f'predictions.shape = {predictions.shape}')
-#print(f'cache.keys() = {cache.keys()}')
 
 llayer = 4
 lhead = 0
@@ -26,16 +24,17 @@ letter = 'k'    # K, Q or V
 letter_w = f'W_{letter.upper()}'
 letter_b = f'b_{letter.upper()}'
 
+d_model = model.cfg.d_model
+center_matrix = torch.eye(d_model, device=device) - torch.ones((d_model,d_model), device=device) / d_model
+
 resid_start = cache['blocks.0.hook_resid_pre'][0]
 resid_llayer = cache[f'blocks.{llayer}.hook_resid_pre'][0]
 inp_llayer = cache[f'blocks.{llayer}.attn.hook_{letter}'][0,:,lhead,:]
 inp_matrix = model.blocks[llayer].attn.get_parameter(letter_w).data[lhead,:,:]
 inp_bias = model.blocks[llayer].attn.get_parameter(letter_b).data[lhead,:]
-#inp_ln1 = model.blocks[llayer].ln1
-#inp_normalized = cache[f'blocks.{llayer}.ln1.hook_normalized'][0,:,:]
-#print(inp_ln1)
 
-ln1_scale = cache[f'blocks.{llayer}.ln1.hook_scale'][0,:]
+ln1_scale = cache[f'blocks.{llayer}.ln1.hook_scale'][0,:] ** -1
+inp_stuff = center_matrix @ inp_matrix
 
 attn_out = []
 mlp_out = []
@@ -46,17 +45,12 @@ for layer in range(llayer):
     attn_out.append(a)
     m = cache[f'blocks.{layer}.hook_mlp_out'][0]
     mlp_out.append(m)
-    attn_pseudo_inp.append((a @ inp_matrix))
-    mlp_pseudo_inp.append((m @ inp_matrix))
+    attn_pseudo_inp.append((a @ inp_stuff) * ln1_scale)
+    mlp_pseudo_inp.append((m @ inp_stuff) * ln1_scale)
 
-def ln1(x):
-    x = x - x.mean(axis=-1, keepdim=True)  # [batch, pos, length]
-    return x / ln1_scale
-
-debug_sum = resid_start @ inp_matrix
+debug_sum = (resid_start @ inp_stuff) * ln1_scale + inp_bias
 for layer in range(llayer):
     debug_sum = debug_sum + attn_pseudo_inp[layer] + mlp_pseudo_inp[layer]
-print(debug_sum.shape, inp_llayer.shape)
-print((ln1(debug_sum) + inp_bias)[:4,:4])
+print(debug_sum[:4,:4])
 print(inp_llayer[:4,:4])
-print((ln1(resid_llayer) @ inp_matrix + inp_bias)[:4,:4])
+print(((resid_llayer @ inp_stuff) * ln1_scale + inp_bias)[:4,:4])
