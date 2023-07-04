@@ -1,3 +1,4 @@
 git+https://github.com/neelnanda-io/TransformerLens
 flask
+jsonschema
 matplotlib
