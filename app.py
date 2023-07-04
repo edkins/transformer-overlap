@@ -49,6 +49,7 @@ def tokenize():
             'n_layers': model.cfg.n_layers,
             'n_heads': model.cfg.n_heads,
             'd_model': model.cfg.d_model,
+            'd_head': model.cfg.d_head,
         },
         'prompt': {
             'text': text,
