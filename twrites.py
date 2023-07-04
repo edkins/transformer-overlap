@@ -24,25 +24,24 @@ n_tokens = len(tokens)
 print(f'Number of tokens: {n_tokens}')
 _, cache = model.run_with_cache(prompt)
 
-X = np.zeros((n_layers, n_heads, d_head, d_model))
-for layer in range(n_layers):
-    X[layer, :, :, :] = model.blocks[layer].attn.W_O.data.cpu()
+X = np.zeros((n_heads, d_head, d_model))
+X[:, :, :] = model.blocks[4].attn.W_O.data.cpu()
 
-X = X.reshape(n_layers * n_heads * d_head, d_model)
+X = X.reshape(n_heads * d_head, d_model)
 
-n_components = 50
-learn = DictionaryLearning(n_components=n_components, verbose=True, max_iter=50)
+n_components = 100
+learn = DictionaryLearning(n_components=n_components, verbose=True, max_iter=100)
 #learn = PCA(n_components=n_components)
 learn.fit(X)
 
-fig, ax = plt.subplots(n_heads, n_layers)
+fig, ax = plt.subplots(n_heads, 3)
 
-for layer in range(n_layers):
+for layer in [3,4,5]:
     for head in range(n_heads):
         stuff = cache[f'blocks.{layer}.attn.hook_result'][0, :, head, :].cpu().numpy()
         viz = np.zeros((n_tokens, n_components))
         viz[:, :] = learn.transform(stuff)
 
-        ax[head, layer].axis('off')
-        ax[head, layer].imshow(viz, aspect='auto', cmap='coolwarm', norm=matplotlib.colors.CenteredNorm())
+        ax[head, layer-3].axis('off')
+        ax[head, layer-3].imshow(viz, aspect='auto', cmap='coolwarm', norm=matplotlib.colors.CenteredNorm())
 plt.show()
