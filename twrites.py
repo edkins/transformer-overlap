@@ -3,7 +3,7 @@ import transformer_lens
 import torch
 import matplotlib
 from matplotlib import pyplot as plt
-from sklearn.decomposition import DictionaryLearning
+from sklearn.decomposition import DictionaryLearning, PCA
 
 prompt = "This is so confusing and I don't know what to do."
 
@@ -24,24 +24,25 @@ n_tokens = len(tokens)
 print(f'Number of tokens: {n_tokens}')
 _, cache = model.run_with_cache(prompt)
 
-fig, ax = plt.subplots(n_heads, 1)
-layer = 2
-X = np.zeros((n_layers * n_heads * n_tokens, d_model))
-for head in range(n_heads):
-    X[head * n_tokens:(head + 1) * n_tokens, :] = cache[f'blocks.{layer}.attn.hook_result'][0, :, head, :].cpu()
+X = np.zeros((n_layers, n_heads, d_head, d_model))
+for layer in range(n_layers):
+    X[layer, :, :, :] = model.blocks[layer].attn.W_O.data.cpu()
 
-n_components = 100
-learn = DictionaryLearning(n_components=n_components, verbose=True)
-Xt = learn.fit_transform(X)
+X = X.reshape(n_layers * n_heads * d_head, d_model)
 
-for head in range(n_heads):
-    viz = np.zeros((n_tokens, n_components))
-    viz[:, :] = Xt[head * n_tokens:(head + 1) * n_tokens, :]
+n_components = 50
+learn = DictionaryLearning(n_components=n_components, verbose=True, max_iter=50)
+#learn = PCA(n_components=n_components)
+learn.fit(X)
 
-    # hide axes and ticks
-    ax[head].axis('off')
-    #ax[head].set_xticks([])
-    #ax[head].set_yticks([])
+fig, ax = plt.subplots(n_heads, n_layers)
 
-    ax[head].imshow(viz, aspect='auto', cmap='coolwarm', norm=matplotlib.colors.CenteredNorm())
+for layer in range(n_layers):
+    for head in range(n_heads):
+        stuff = cache[f'blocks.{layer}.attn.hook_result'][0, :, head, :].cpu().numpy()
+        viz = np.zeros((n_tokens, n_components))
+        viz[:, :] = learn.transform(stuff)
+
+        ax[head, layer].axis('off')
+        ax[head, layer].imshow(viz, aspect='auto', cmap='coolwarm', norm=matplotlib.colors.CenteredNorm())
 plt.show()
