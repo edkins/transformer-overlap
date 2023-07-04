@@ -31,17 +31,18 @@ X = X.reshape(n_heads * d_head, d_model)
 
 n_components = 100
 learn = DictionaryLearning(n_components=n_components, verbose=True, max_iter=100)
-#learn = PCA(n_components=n_components)
 learn.fit(X)
 
-fig, ax = plt.subplots(n_heads, 3)
+fig, ax = plt.subplots(n_tokens, 1)
 
-for layer in [3,4,5]:
-    for head in range(n_heads):
-        stuff = cache[f'blocks.{layer}.attn.hook_result'][0, :, head, :].cpu().numpy()
-        viz = np.zeros((n_tokens, n_components))
-        viz[:, :] = learn.transform(stuff)
+stuff = np.zeros((n_layers, n_tokens, n_components))
+for layer in range(n_layers):
+    stuff[layer-3,:,:] = learn.transform(cache[f'blocks.{layer}.hook_resid_pre'][0, :, :].cpu().numpy())
 
-        ax[head, layer-3].axis('off')
-        ax[head, layer-3].imshow(viz, aspect='auto', cmap='coolwarm', norm=matplotlib.colors.CenteredNorm())
+for tok in range(n_tokens):
+    viz = np.zeros((n_layers, n_components))
+    viz[:, :] = stuff[:, tok, :]
+
+    ax[tok].axis('off')
+    ax[tok].imshow(viz, aspect='auto', cmap='coolwarm', norm=matplotlib.colors.CenteredNorm())
 plt.show()
