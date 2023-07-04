@@ -25,12 +25,18 @@ _, cache = model.run_with_cache(prompt)
 
 fig, ax = plt.subplots(1, 1)
 
-stuff = np.zeros((n_layers + 1, n_tokens))
+stuff = np.zeros((2 * n_layers + 1, n_tokens, d_model))
 for layer in range(n_layers):
-    resid = cache[f'blocks.{layer}.hook_resid_pre'][0, :, :].cpu().numpy()
-    stuff[layer,1:] = np.linalg.norm(resid, axis=1)[1:]
-resid = cache[f'blocks.{n_layers-1}.hook_resid_post'][0, :, :].cpu().numpy()
-stuff[n_layers,1:] = np.linalg.norm(resid, axis=1)[1:]
+    resid = cache[f'blocks.{layer}.hook_resid_pre'][0, :, :].cpu().numpy()[1:,:]
+    stuff[2*layer,1:,:] = resid
+    resid = cache[f'blocks.{layer}.hook_resid_mid'][0, :, :].cpu().numpy()[1:,:]
+    stuff[2*layer+1,1:,:] = resid
+resid = cache[f'blocks.{n_layers-1}.hook_resid_post'][0, :, :].cpu().numpy()[1:,:]
+stuff[2*n_layers,1:,:] = resid
 
-ax.bar(np.arange((n_layers+1) * n_tokens), stuff.reshape(-1))
+color = (['blue'] * n_tokens + ['green'] * n_tokens) * n_layers + ['blue'] * n_tokens
+
+ax.bar(np.arange((2*n_layers+1) * n_tokens), np.linalg.norm(stuff,axis=2).reshape(-1), 1,color=color)
+
+ax.bar(np.arange(n_tokens, (2*n_layers+1) * n_tokens), np.linalg.norm((stuff[1:] - stuff[:-1]),axis=2).reshape(-1), 1, color='orange')
 plt.show()
