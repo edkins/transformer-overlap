@@ -66,9 +66,12 @@ for layer in range(min_layer, max_layer):
         n_toks1 = n_toks - 1
         kq = kq[1:,1:,:]
         a = a[1:,1:].reshape(n_toks1, n_toks1, 1)
-        reducer = TruncatedSVD(n_components=3)
-        kqat = torch.nn.functional.normalize(torch.tensor(reducer.fit_transform(kq.reshape(n_toks1 * n_toks1, dkq))))
-        colors = np.clip(torch.abs(kqat.reshape(n_toks1, n_toks1, 3)) * (a ** 0.3), 0, 1)
+        reducer = PCA(n_components=3)
+        kqt = torch.tensor(reducer.fit_transform(kq.reshape(n_toks1 * n_toks1, dkq)))
+        kqt = kqt.reshape(n_toks1, n_toks1, 3)
+        colors = 0.5 + kqt - kqt.mean(dim=2, keepdim=True)
+        colors = torch.atan(colors) / np.pi + 0.5
+        colors = torch.clip(colors * (a ** 0.3), 0, 1)
         the_ax = ax[layer - min_layer, head - min_head]
         the_ax.imshow(colors, interpolation='nearest')
         the_ax.set_xticks([])
