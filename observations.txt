@@ -3,6 +3,7 @@ kqa: kqa = (kq * a.reshape(n_toks, n_toks, 1))[1:,1:,:]  # remove first token
 ge: G-iles Ed-kins
 np: import n-umpy as np
 prompt: prom-pt = sys.arg-v[1]
+article: In this article, we are going to discuss how to normalize 1D and 2D arrays in Python using NumPy.
 
 GPT2-small
 ==========
@@ -21,6 +22,10 @@ L0 H5:
 quickbrown - attends mostly to current token except shared between "The" and " the"
 kqa - attends mostly to current token except between current and prev instances of kq, n_toks and 1: (multiple tokens each)
 prompt - current token
+
+L0 H6:
+quickbrown - horizontal colour stripes corresponding to: "the quick brown fox", "jumps", "over the", "lazy", "dog".
+article - "green" stripes for "article", "discuss", "ize", "arrays", "Python", "NumP, "Py"
 
 L1 H3:
 quickbrown - smushes everything out equally
