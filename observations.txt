@@ -1,0 +1,74 @@
+quickbrown: The quick brown fox jumps over the lazy dog
+kqa: kqa = (kq * a.reshape(n_toks, n_toks, 1))[1:,1:,:]  # remove first token
+ge: G-iles Ed-kins
+np: import n-umpy as np
+prompt: prom-pt = sys.arg-v[1]
+
+GPT2-small
+==========
+
+L0 H1:
+quickbrown - attends mostly to current token except shared between "The" and " the"
+kqa - attends mostly to current token except between current and prev instances of kq, n_toks and 1: (multiple tokens each)
+prompt - current token
+
+L0 H3:
+quickbrown - attends mostly to current token except "jumps over the" is blurred
+kqa - attends mostly to current token except a few wiggles
+prompt - current token except . attends to lots of stuff and "]" attends to "["
+
+L0 H5:
+quickbrown - attends mostly to current token except shared between "The" and " the"
+kqa - attends mostly to current token except between current and prev instances of kq, n_toks and 1: (multiple tokens each)
+prompt - current token
+
+L1 H3:
+quickbrown - smushes everything out equally
+kqa - smushes everything out equally
+
+L1 H10:
+quickbrown - smushes everything out equally
+kqa - smushes everything out equally
+
+L3 H1:
+np - attends mostly to first real token ("import")
+prompt - attends a lot to "=" and "sys"
+
+L3 H3:
+quickbrown - wonky previous token.
+kqa - wonky previous token that sometimes attends several tokens back
+ge - "G-iles" and " Ed-kins": attends partly to current token if it's the second token
+prompt - current token for "=". last-but-one for "arg-v".
+
+L3 H4:
+quickbrown - attends to previous noun
+kqa - ?
+np - most of the attention is "import n" 
+prompt - very little attention here
+
+L4 H11:
+quickbrown - attends to previous token
+kqa - attends to previous token
+
+L5 H6:
+quickbrown - attends mostly to previous token, but "lazy dog" is blurred
+kqa - attends to previous token with some gaps
+np - mostly attends to previous token but slightly current-token for "import" and "n"
+prompt - "argv" is blurred
+
+L6 H9:
+quickbrown - attends to previous adjective
+kqa - attends to previous instance of repeated words
+
+L8 H7:
+quickbrown - separates two clauses
+kqa - separates about ten clauses
+prompt - ?
+
+L10 H11:
+quickbrown - separates two clauses
+kqa - separates 2(?) clauses
+prompt - very little attention
+
+L11 H8:
+ge - by far the brightest of levels 8-11
