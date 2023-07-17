@@ -26,6 +26,8 @@ print(f'n_toks = {n_toks}')
 for i,t in enumerate(toks):
     print(f'{i}: {model.tokenizer.decode(t)}')
 
+alg = 2
+
 predictions, cache = model.run_with_cache(prompt)
 fig, ax = plt.subplots(n_layers, n_heads)
 for layer in range(n_layers):
@@ -33,16 +35,26 @@ for layer in range(n_layers):
         k = cache[f'blocks.{layer}.attn.hook_k'][0,:,head,:]
         q = cache[f'blocks.{layer}.attn.hook_q'][0,:,head,:]
         a = cache[f'blocks.{layer}.attn.hook_pattern'][0][head,:,:]
-        kq = torch.nn.functional.normalize(torch.concatenate((
-            k.reshape(1, n_toks, d_head).expand(n_toks, n_toks, d_head),
-            q.reshape(n_toks, 1, d_head).expand(n_toks, n_toks, d_head),
-        ), dim=2), dim=2)
+
+        if alg == 1:
+            kq = torch.nn.functional.normalize(torch.concatenate((
+                k.reshape(1, n_toks, d_head).expand(n_toks, n_toks, d_head),
+                q.reshape(n_toks, 1, d_head).expand(n_toks, n_toks, d_head),
+            ), dim=2), dim=2)
+            dkq = 2 * d_head
+        elif alg == 2:
+            kq = torch.nn.functional.normalize(
+                k.reshape(1, n_toks, d_head) * q.reshape(n_toks, 1, d_head),
+                dim=2)
+            dkq = d_head
+        else:
+            raise ValueError(f'Unknown alg {alg}')
         n_toks1 = n_toks - 1
         kqa = (kq * a.reshape(n_toks, n_toks, 1))[1:,1:,:]  # remove first token
         reducer = TruncatedSVD(n_components=3)
-        kqat = reducer.fit_transform(kqa.reshape(n_toks1 * n_toks1, 2 * d_head))
+        kqat = reducer.fit_transform(kqa.reshape(n_toks1 * n_toks1, dkq))
         colors = np.clip(0.25 + 2 * kqat.reshape(n_toks1, n_toks1, 3), 0, 1)
-        ax[layer, head].imshow(colors)
+        ax[layer, head].imshow(colors, interpolation='nearest')
         ax[layer, head].set_xticks([])
         ax[layer, head].set_yticks([])
         ax[layer, head].set_title(f'L{layer} H{head}')
