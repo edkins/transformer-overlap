@@ -20,6 +20,7 @@ def _get_model(model_name):
     if model_name not in model_cache:
         print(f'Loading model {model_name}')
         model_cache[model_name] = transformer_lens.HookedTransformer.from_pretrained('gpt2-small', device=device)
+        model_cache[model_name].set_use_attn_result(True)   # says it can burn through gpu memory
     return model_cache[model_name]
 
 _get_model('gpt2-small')
@@ -85,21 +86,28 @@ schema_activations = {
     'required': ['prompt_text', 'model_name', 'byte_length', 'sections'],
 }
 
-def _extract_flow(model, cache, layer, head, tok, n_tokens):
-    attn = cache[f'blocks.{layer}.attn.hook_pattern'][0,head,tok,:]
-    wv = model.blocks[layer].attn.W_V.data[head,:,:]
-    l2 = layer - 1
-    if l2 < 0:
-        raise ValueError('Cannot extract flow from layer 0')
-    mlp_out = cache[f'blocks.{l2}.hook_mlp_out'][0,:,:]
-    mlp_residual = cache[f'blocks.{l2}.hook_resid_post'][0,:,:]
-    stuff = (mlp_out @ wv)
-    residual_stuff = (mlp_residual @ wv)
-    mlp_contrib = (1 - stuff.norm(dim=1) / residual_stuff.norm(dim=1)) * attn
+def _extract_flow(model, cache, layer, n_tokens):
+    n_heads = model.cfg.n_heads
+    d_model = model.cfg.d_model
+    d_head = model.cfg.d_head
+    result = torch.zeros((n_tokens, layer, 1 + n_heads, n_tokens), dtype=torch.float32)
 
-    result = torch.zeros((n_tokens,2))
-    result[:,0] = mlp_contrib
-    result[:,1] = attn
+    final_resid = cache[f'blocks.{layer}.hook_resid_post'][0,:,:]   # token x d_model
+    multiplier = final_resid * (final_resid.norm(dim=1, keepdim=True) ** -2)   # token x d_model
+    multiplier_broadcast = multiplier.reshape((n_tokens, 1, d_model, 1))   # token x (head) x d_model x (token)
+
+    for l2 in range(layer):
+        v_out = cache[f'blocks.{l2}.attn.hook_v'][0,:,:,:]   # token x head x d_head
+        attn = cache[f'blocks.{l2}.attn.hook_pattern'][0,:,:,:]   # head x token x token
+        w_o = model.blocks[l2].attn.W_O.data   # head x d_head x d_model
+        head_out = torch.einsum('thv,htu,hvm->thmu', v_out, attn, w_o)   # token x head x d_model x token
+#        print(head_out.shape, multiplier_broadcast.shape)
+        result[:,l2,:n_heads,:] = (head_out * multiplier_broadcast).sum(dim=2)   # token x head x token
+
+        mlp_out = cache[f'blocks.{l2}.hook_mlp_out'][0,:,:]    # token x d_model
+        mlp_vec = (mlp_out * multiplier).sum(dim=1)    # token
+        for t in range(n_tokens):
+            result[t,l2,n_heads,t] = mlp_vec[t]
 
     return result
 
@@ -111,12 +119,8 @@ def _extract_from_cache(model, cache, n_tokens, name: str, dims: list[int], dtyp
         t = torch.zeros((n_layers, n_heads, n_tokens, n_tokens), dtype=torch.float32)
         for layer in range(n_layers):
             t[layer,:,:,:] = cache[f'blocks.{layer}.attn.hook_pattern']
-    elif name == 'flow' and dtype == 'float32':
-        t = torch.zeros((n_tokens,n_tokens,2), dtype=torch.float32)
-        for tok in range(n_tokens):
-            layer = 4
-            head = 0
-            t[tok,:,:] = _extract_flow(model, cache, layer, head, tok, n_tokens)
+    elif name == 'flow3' and dtype == 'float32':
+        t = _extract_flow(model, cache, 3, n_tokens)
     else:
         raise ValueError(f'Unsupported name/dtype combination: {name}/{dtype}')
 
