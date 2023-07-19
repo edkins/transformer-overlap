@@ -36,43 +36,13 @@ print(f'n_toks = {n_toks}')
 for i,t in enumerate(toks):
     print(f'{i}: {model.tokenizer.decode(t)}')
 
-alg = 2
-
 predictions, cache = model.run_with_cache(prompt)
 fig, ax = plt.subplots(max_layer - min_layer, max_head - min_head, squeeze=False)
 for layer in range(min_layer, max_layer):
     for head in range(min_head, max_head):
-        k = cache[f'blocks.{layer}.attn.hook_k'][0,:,head,:]
-        q = cache[f'blocks.{layer}.attn.hook_q'][0,:,head,:]
         a = cache[f'blocks.{layer}.attn.hook_pattern'][0][head,:,:]
-
-        if alg == 1:
-            kq = torch.concatenate((
-                k.reshape(1, n_toks, d_head).expand(n_toks, n_toks, d_head),
-                q.reshape(n_toks, 1, d_head).expand(n_toks, n_toks, d_head),
-            ), dim=2)
-            dkq = 2 * d_head
-        elif alg == 2:
-            kq = k.reshape(1, n_toks, d_head) * q.reshape(n_toks, 1, d_head)
-            dkq = d_head
-        else:
-            raise ValueError(f'Unknown alg {alg}')
-
-        # erase lower (upper?) triangle of kq
-        mask = torch.tril(torch.ones(n_toks, n_toks), diagonal=1).to(device)
-        kq = kq * mask.reshape(n_toks, n_toks, 1)
-
-        n_toks1 = n_toks - 1
-        kq = kq[1:,1:,:]
-        a = a[1:,1:].reshape(n_toks1, n_toks1, 1)
-        reducer = PCA(n_components=3)
-        kqt = torch.tensor(reducer.fit_transform(kq.reshape(n_toks1 * n_toks1, dkq)))
-        kqt = kqt.reshape(n_toks1, n_toks1, 3)
-        colors = 0.5 + kqt - kqt.mean(dim=2, keepdim=True)
-        colors = torch.atan(colors) / np.pi + 0.5
-        colors = torch.clip(colors * (a ** 0.3), 0, 1)
         the_ax = ax[layer - min_layer, head - min_head]
-        the_ax.imshow(colors, interpolation='nearest')
+        the_ax.imshow(a[1:,1:] ** 0.5, interpolation='nearest', cmap='gray')
         the_ax.set_xticks([])
         the_ax.set_yticks([])
         the_ax.set_title(f'L{layer} H{head}')

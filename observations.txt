@@ -4,6 +4,7 @@ ge: G-iles Ed-kins
 np: import n-umpy as np
 prompt: prom-pt = sys.arg-v[1]
 article: In this article, we are going to discuss how to normalize 1D and 2D arrays in Python using NumPy.
+env: this may be due to an incorrectly set up environment, e.g. changing env variable CUDA_VISIBLE_DEVICES after program start
 
 GPT2-small
 ==========
@@ -34,6 +35,9 @@ kqa - smushes everything out equally
 L1 H10:
 quickbrown - smushes everything out equally
 kqa - smushes everything out equally
+
+L1 H11:
+env - attends both from and to three particular tokens
 
 L3 H1:
 np - attends mostly to first real token ("import")
